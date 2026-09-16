@@ -1,0 +1,35 @@
+{
+  "name": "azure-devops-mcp",
+  "version": "1.0.0",
+  "description": "An Azure DevOps MCP server for work item read/write, queries, and project reporting",
+  "type": "module",
+  "main": "dist/server.js",
+  "bin": {
+    "azure-devops-mcp": "dist/server.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "dev": "tsx src/server.ts",
+    "start": "node dist/server.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  }
+}
