@@ -1,5 +1,7 @@
 # Azure DevOps MCP Server
 
+[![CI](https://github.com/NerdFlanders/azure-devops-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/NerdFlanders/azure-devops-mcp/actions/workflows/ci.yml)
+
 A Node.js 20+ Model Context Protocol (MCP) server using stdio for Azure DevOps integration.
 
 ## Configuration
