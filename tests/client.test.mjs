@@ -332,6 +332,89 @@ test("invalid paging inputs fail before HTTP", async () => {
   globalThis.fetch = async () => { assert.fail("Unexpected HTTP request"); };
   await assert.rejects(handleToolCall("list_projects", { ...toolInput, pageSize: 201 }), /pageSize/);
   await assert.rejects(handleToolCall("get_work_item_history", { ...toolInput, id: 1, skip: -1 }), /skip/);
+  await assert.rejects(handleToolCall("list_teams", { ...toolInput, skip: -1 }), /skip/);
+  await assert.rejects(handleToolCall("get_team_members", { ...toolInput, team: "Team", skip: -1 }), /skip/);
+});
+
+test("team listing and membership tools support paging and filters", async () => {
+  globalThis.fetch = async (url) => {
+    assert.equal(url.pathname, "/example/_apis/projects/Project/teams");
+    assert.equal(url.searchParams.get("$top"), "3");
+    assert.equal(url.searchParams.get("$skip"), "2");
+    assert.equal(url.searchParams.get("mine"), "true");
+    return response({ value: [{ id: "t1", name: "Team 1" }, { id: "t2", name: "Team 2" }, { id: "t3", name: "Team 3" }] });
+  };
+  const result = toolValue(await handleToolCall("list_teams", { ...toolInput, pageSize: 2, skip: 2, mine: true }));
+  assert.equal(result.count, 2);
+  assert.equal(result.hasMore, true);
+  assert.equal(result.nextSkip, 4);
+  assert.deepEqual(result.items, [{ id: "t1", name: "Team 1" }, { id: "t2", name: "Team 2" }]);
+
+  globalThis.fetch = async (url) => {
+    assert.equal(url.pathname, "/example/_apis/projects/Project/teams/My%20Team/members");
+    assert.equal(url.searchParams.get("$top"), "3");
+    return response({ value: [{ identity: { displayName: "Alice" } }] });
+  };
+  const membersResult = toolValue(await handleToolCall("get_team_members", { ...toolInput, team: "My Team", pageSize: 2 }));
+  assert.equal(membersResult.count, 1);
+  assert.equal(membersResult.hasMore, false);
+  assert.equal(membersResult.nextSkip, null);
+});
+
+test("team capacity retrieves iteration capacities for a team", async () => {
+  globalThis.fetch = async (url) => {
+    assert.equal(url.pathname, "/example/Project/My%20Team/_apis/work/teamsettings/iterations/iter-guid/capacities");
+    return response({ teamMembers: [{ teamMember: { displayName: "Bob" }, activities: [{ capacityPerDay: 6 }] }] });
+  };
+  const capacityResult = toolValue(await handleToolCall("get_team_capacity", { ...toolInput, team: "My Team", iterationId: "iter-guid" }));
+  assert.equal(capacityResult.teamMembers[0].teamMember.displayName, "Bob");
+});
+
+test("pipeline definition listing, runs, timeline and logs work as expected", async () => {
+  // list_pipeline_definitions
+  globalThis.fetch = async (url) => {
+    assert.equal(url.pathname, "/example/Project/_apis/build/definitions");
+    assert.equal(url.searchParams.get("name"), "CI-Build");
+    assert.equal(url.searchParams.get("repositoryId"), "repo-1");
+    return new Response('{"value":[{"id":10,"name":"CI-Build"}]}', { headers: { "x-ms-continuationtoken": "token-123" } });
+  };
+  const defsResult = toolValue(await handleToolCall("list_pipeline_definitions", { ...toolInput, name: "CI-Build", repositoryId: "repo-1" }));
+  assert.equal(defsResult.count, 1);
+  assert.equal(defsResult.hasMore, true);
+  assert.equal(defsResult.continuationToken, "token-123");
+
+  // get_pipeline_run
+  globalThis.fetch = async (url) => {
+    assert.equal(url.pathname, "/example/Project/_apis/build/builds/100");
+    return response({ id: 100, buildNumber: "2026.1", status: "completed", result: "succeeded" });
+  };
+  const runResult = toolValue(await handleToolCall("get_pipeline_run", { ...toolInput, runId: 100 }));
+  assert.equal(runResult.id, 100);
+  assert.equal(runResult.result, "succeeded");
+
+  // get_pipeline_run_timeline
+  globalThis.fetch = async (url) => {
+    assert.equal(url.pathname, "/example/Project/_apis/build/builds/100/timeline");
+    return response({ records: [{ name: "Build Stage", type: "Stage", result: "succeeded" }] });
+  };
+  const timelineResult = toolValue(await handleToolCall("get_pipeline_run_timeline", { ...toolInput, runId: 100 }));
+  assert.equal(timelineResult.records[0].name, "Build Stage");
+
+  // get_pipeline_run_logs list
+  globalThis.fetch = async (url) => {
+    assert.equal(url.pathname, "/example/Project/_apis/build/builds/100/logs");
+    return response({ value: [{ id: 1, type: "Container" }] });
+  };
+  const logsListResult = toolValue(await handleToolCall("get_pipeline_run_logs", { ...toolInput, runId: 100 }));
+  assert.equal(logsListResult[0].id, 1);
+
+  // get_pipeline_run_logs single
+  globalThis.fetch = async (url) => {
+    assert.equal(url.pathname, "/example/Project/_apis/build/builds/100/logs/1");
+    return response({ count: 10, value: ["Build started", "Build completed"] });
+  };
+  const logContentResult = toolValue(await handleToolCall("get_pipeline_run_logs", { ...toolInput, runId: 100, logId: 1 }));
+  assert.equal(logContentResult.count, 10);
 });
 
 test("read retries stop at the configured attempt budget", async () => {

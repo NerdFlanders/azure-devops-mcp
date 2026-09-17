@@ -43,6 +43,40 @@ export const TOOLS: Tool[] = [
     },
   },
   {
+    name: "list_teams",
+    description: "List one page of Azure DevOps teams in a project. Pass nextSkip as skip to read the next page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Azure DevOps project name" },
+        pageSize: pageSizeProperty,
+        skip: { type: "integer", minimum: 0, default: 0, description: "Teams to skip" },
+        mine: { type: "boolean", description: "If true, filter to teams the current user belongs to" },
+        organizationUrl: { type: "string" },
+        personalAccessToken: { type: "string" },
+      },
+      required: ["project"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_team_members",
+    description: "List members of a specific Azure DevOps team. Pass nextSkip as skip to read the next page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Azure DevOps project name" },
+        team: { type: "string", minLength: 1, description: "Team name or ID" },
+        pageSize: pageSizeProperty,
+        skip: { type: "integer", minimum: 0, default: 0, description: "Members to skip" },
+        organizationUrl: { type: "string" },
+        personalAccessToken: { type: "string" },
+      },
+      required: ["project", "team"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "get_work_item",
     description: "Retrieve a single Azure DevOps work item with all fields.",
     inputSchema: {
@@ -165,6 +199,22 @@ export const TOOLS: Tool[] = [
         personalAccessToken: { type: "string" },
       },
       required: ["project"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_team_capacity",
+    description: "Get sprint capacity and days off for team members for a specific sprint/iteration.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Azure DevOps project name" },
+        team: { type: "string", minLength: 1, description: "Team name or ID" },
+        iterationId: { type: "string", minLength: 1, description: "Iteration ID (GUID) or iteration identifier" },
+        organizationUrl: { type: "string" },
+        personalAccessToken: { type: "string" },
+      },
+      required: ["project", "team", "iterationId"],
       additionalProperties: false,
     },
   },
@@ -388,6 +438,25 @@ export const TOOLS: Tool[] = [
     },
   },
   {
+    name: "list_pipeline_definitions",
+    description: "List one page of Azure Pipelines build/pipeline definitions in a project. Follow continuationToken when hasMore is true.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...pageProperties,
+        project: { type: "string", description: "Azure DevOps project name" },
+        name: { type: "string", description: "Optional definition name filter" },
+        path: { type: "string", description: "Optional folder path filter, e.g. \\MyFolder" },
+        repositoryId: { type: "string", description: "Optional repository ID or name filter" },
+        repositoryType: { type: "string", description: "Optional repository type filter, e.g. TfsGit, GitHub" },
+        organizationUrl: { type: "string" },
+        personalAccessToken: { type: "string" },
+      },
+      required: ["project"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "get_pipeline_runs",
     description: "List one page of Azure Pipelines runs for a project and optional definition. Follow continuationToken when hasMore is true.",
     inputSchema: {
@@ -401,6 +470,53 @@ export const TOOLS: Tool[] = [
         personalAccessToken: { type: "string" },
       },
       required: ["project"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_pipeline_run",
+    description: "Get details for a specific pipeline run or build by its ID.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Azure DevOps project name" },
+        runId: { type: "number", description: "Pipeline run or build ID" },
+        organizationUrl: { type: "string" },
+        personalAccessToken: { type: "string" },
+      },
+      required: ["project", "runId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_pipeline_run_timeline",
+    description: "Get the execution timeline (stages, phases, jobs, tasks, durations, and errors) for a pipeline run.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Azure DevOps project name" },
+        runId: { type: "number", description: "Pipeline run or build ID" },
+        timelineId: { type: "string", description: "Optional timeline ID" },
+        organizationUrl: { type: "string" },
+        personalAccessToken: { type: "string" },
+      },
+      required: ["project", "runId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_pipeline_run_logs",
+    description: "List logs or retrieve log content for a specific pipeline run.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Azure DevOps project name" },
+        runId: { type: "number", description: "Pipeline run or build ID" },
+        logId: { type: "number", description: "Optional log ID to retrieve content for. If omitted, lists all log entries." },
+        organizationUrl: { type: "string" },
+        personalAccessToken: { type: "string" },
+      },
+      required: ["project", "runId"],
       additionalProperties: false,
     },
   },

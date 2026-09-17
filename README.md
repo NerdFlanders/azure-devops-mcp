@@ -245,9 +245,9 @@ through unchanged; include project, area, iteration and type filters yourself.
 
 ## Paging and Metrics
 
-`list_projects`, `get_work_item_comments`, and `get_pipeline_runs` return
+`list_projects`, `list_pipeline_definitions`, `get_work_item_comments`, and `get_pipeline_runs` return
 `{ items, count, limit, hasMore, continuationToken }`. Supply the returned
-token with the same filters for the next page. `get_work_item_history` returns
+token with the same filters for the next page. `list_teams`, `get_team_members`, and `get_work_item_history` return
 `nextSkip` instead; pass it as `skip`. These tools accept `pageSize` (default
 100, maximum 200). Comments require `project` or `AZURE_DEVOPS_PROJECT`.
 Other collection tools retain their existing response contracts.

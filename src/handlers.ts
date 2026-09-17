@@ -122,6 +122,41 @@ async function dispatchToolCall(
       const items = response.data.value ?? [];
       return text(asText({ items, count: items.length, limit, hasMore: !!response.continuationToken, continuationToken: response.continuationToken ?? null }));
     }
+    case "list_teams": {
+      const project = requireString(input, "project");
+      const config = resolveConfig({ ...input, project });
+      const limit = pageSize(input);
+      const skip = input["skip"] === undefined ? 0 : requireNumber(input, "skip");
+      if (!Number.isSafeInteger(skip) || skip < 0) throw new Error("'skip' must be a non-negative integer");
+      const mine = input["mine"] === true ? true : undefined;
+      const response = await callAzureDevOps<any>(config, `/_apis/projects/${encodeURIComponent(project)}/teams`, {
+        query: {
+          "api-version": "7.1",
+          $top: limit + 1,
+          $skip: skip,
+          ...(mine !== undefined ? { mine } : {}),
+        },
+        cacheTtlMs: 60000,
+      });
+      const items = (response.value ?? []).slice(0, limit);
+      const hasMore = (response.value ?? []).length > limit;
+      return text(asText({ items, count: items.length, limit, hasMore, nextSkip: hasMore ? skip + items.length : null }));
+    }
+    case "get_team_members": {
+      const project = requireString(input, "project");
+      const team = requireString(input, "team");
+      const config = resolveConfig({ ...input, project });
+      const limit = pageSize(input);
+      const skip = input["skip"] === undefined ? 0 : requireNumber(input, "skip");
+      if (!Number.isSafeInteger(skip) || skip < 0) throw new Error("'skip' must be a non-negative integer");
+      const response = await callAzureDevOps<any>(config, `/_apis/projects/${encodeURIComponent(project)}/teams/${encodeURIComponent(team)}/members`, {
+        query: { "api-version": "7.1", $top: limit + 1, $skip: skip },
+        cacheTtlMs: 60000,
+      });
+      const items = (response.value ?? []).slice(0, limit);
+      const hasMore = (response.value ?? []).length > limit;
+      return text(asText({ items, count: items.length, limit, hasMore, nextSkip: hasMore ? skip + items.length : null }));
+    }
     case "get_work_item": {
       const id = Number(input["id"]);
       if (!Number.isFinite(id)) {
@@ -235,6 +270,16 @@ async function dispatchToolCall(
         query: { "api-version": "7.1" }, cacheTtlMs: 60000,
       });
       return text(asText(response.value ?? response));
+    }
+    case "get_team_capacity": {
+      const project = requireString(input, "project");
+      const team = requireString(input, "team");
+      const iterationId = requireString(input, "iterationId");
+      const config = resolveConfig({ ...input, project });
+      const response = await callAzureDevOps<any>(config, `${teamPath(project, team)}/_apis/work/teamsettings/iterations/${encodeURIComponent(iterationId)}/capacities`, {
+        query: { "api-version": "7.1" },
+      });
+      return text(asText(response));
     }
     case "get_sprint_work_items": {
       const project = requireString(input, "project");
@@ -419,6 +464,29 @@ async function dispatchToolCall(
       });
       return text(asText(response.value ?? response));
     }
+    case "list_pipelines":
+    case "list_pipeline_definitions": {
+      const project = requireString(input, "project");
+      const config = resolveConfig({ ...input, project });
+      const limit = pageSize(input);
+      const name = typeof input["name"] === "string" ? input["name"] : undefined;
+      const path = typeof input["path"] === "string" ? input["path"] : undefined;
+      const repositoryId = typeof input["repositoryId"] === "string" ? input["repositoryId"] : undefined;
+      const repositoryType = typeof input["repositoryType"] === "string" ? input["repositoryType"] : undefined;
+      const response = await callAzureDevOpsPage<{ value?: any[] }>(config, `/${encodeURIComponent(project)}/_apis/build/definitions`, {
+        query: {
+          "api-version": "7.1",
+          $top: limit,
+          continuationToken: continuation(input),
+          ...(name ? { name } : {}),
+          ...(path ? { path } : {}),
+          ...(repositoryId ? { repositoryId } : {}),
+          ...(repositoryType ? { repositoryType } : {}),
+        },
+      });
+      const items = response.data.value ?? [];
+      return text(asText({ items, count: items.length, limit, hasMore: !!response.continuationToken, continuationToken: response.continuationToken ?? null }));
+    }
     case "get_pipeline_runs": {
       const project = requireString(input, "project");
       const config = resolveConfig({ ...input, project });
@@ -434,6 +502,44 @@ async function dispatchToolCall(
       });
       const items = response.data.value ?? [];
       return text(asText({ items, count: items.length, limit, hasMore: !!response.continuationToken, continuationToken: response.continuationToken ?? null }));
+    }
+    case "get_pipeline_run": {
+      const project = requireString(input, "project");
+      const runId = requireNumber(input, "runId");
+      const config = resolveConfig({ ...input, project });
+      const response = await callAzureDevOps<any>(config, `/${encodeURIComponent(project)}/_apis/build/builds/${runId}`, {
+        query: { "api-version": "7.1" },
+      });
+      return text(asText(response));
+    }
+    case "get_pipeline_run_timeline": {
+      const project = requireString(input, "project");
+      const runId = requireNumber(input, "runId");
+      const timelineId = typeof input["timelineId"] === "string" ? input["timelineId"] : undefined;
+      const config = resolveConfig({ ...input, project });
+      const timelinePath = timelineId
+        ? `/${encodeURIComponent(project)}/_apis/build/builds/${runId}/timeline/${encodeURIComponent(timelineId)}`
+        : `/${encodeURIComponent(project)}/_apis/build/builds/${runId}/timeline`;
+      const response = await callAzureDevOps<any>(config, timelinePath, {
+        query: { "api-version": "7.1" },
+      });
+      return text(asText(response));
+    }
+    case "get_pipeline_run_logs": {
+      const project = requireString(input, "project");
+      const runId = requireNumber(input, "runId");
+      const logId = typeof input["logId"] === "number" || (typeof input["logId"] === "string" && input["logId"].trim() !== "") ? Number(input["logId"]) : undefined;
+      const config = resolveConfig({ ...input, project });
+      if (logId !== undefined && Number.isFinite(logId)) {
+        const response = await callAzureDevOps<any>(config, `/${encodeURIComponent(project)}/_apis/build/builds/${runId}/logs/${logId}`, {
+          query: { "api-version": "7.1" },
+        });
+        return text(typeof response === "string" ? response : asText(response));
+      }
+      const response = await callAzureDevOps<{ value?: any[] }>(config, `/${encodeURIComponent(project)}/_apis/build/builds/${runId}/logs`, {
+        query: { "api-version": "7.1" },
+      });
+      return text(asText(response.value ?? response));
     }
     case "get_release_status": {
       const project = requireString(input, "project");
